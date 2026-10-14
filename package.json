@@ -1,12 +1,12 @@
 {
   "name": "mi-launcher",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Launcher personalizado de Minecraft (Fabric)",
   "author": "Darwin",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win publish always"
+    "build": "electron-builder --win"
   },
   "license": "MIT",
   "build": {
