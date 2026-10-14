@@ -19,4 +19,6 @@ contextBridge.exposeInMainWorld("api", {
   onLog: (cb) => on("log", cb),
   onProgress: (cb) => on("progress", cb),
   onState: (cb) => on("state", cb),
+    onUpdate: (cb) => on("update", cb),
+  installUpdate: () => ipcRenderer.invoke("update:install"),
 });

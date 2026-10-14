@@ -508,3 +508,49 @@ window.api.onLog((line) => {
   const s = await window.api.getSession();
   setUser(s && s.name);
 })();
+
+(() => {
+  const banner = document.getElementById("updateBanner");
+  const text = document.getElementById("updateText");
+  const bar = document.getElementById("updateBar");
+  const fill = document.getElementById("updateFill");
+  const btns = document.getElementById("updateBtns");
+  const btnNow = document.getElementById("updateNow");
+  const btnLater = document.getElementById("updateLater");
+
+  const show = () => banner.classList.add("show");
+  const hide = () => banner.classList.remove("show");
+
+  bar.hidden = true;
+  btns.hidden = true;
+
+  window.api.onUpdate((u) => {
+    if (u.state === "checking") {
+      text.textContent = "Buscando actualizaciones...";
+      bar.hidden = true;
+      btns.hidden = true;
+      show();
+    } else if (u.state === "downloading") {
+      text.textContent = `Descargando actualización... ${u.pct || 0}%`;
+      fill.style.width = (u.pct || 0) + "%";
+      bar.hidden = false;
+      btns.hidden = true;
+      show();
+    } else if (u.state === "ready") {
+      text.textContent = `Nueva versión v${u.version} lista`;
+      bar.hidden = true;
+      btns.hidden = false;
+      show();
+    } else {
+      hide(); // sin actualización o error
+    }
+  });
+
+  // Mientras Minecraft está abierto, no dejar reiniciar el launcher
+  window.api.onState((s) => {
+    btnNow.disabled = s === "loading" || s === "launching" || s === "running";
+  });
+
+  btnNow.onclick = () => window.api.installUpdate();
+  btnLater.onclick = hide;
+})();

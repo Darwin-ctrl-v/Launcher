@@ -378,6 +378,10 @@ ipcMain.handle("cape:set", async (_e, capeId) => {
   }
 });
 
+ipcMain.handle("update:install", () => {
+  autoUpdater.quitAndInstall(true, true);
+});
+
 /* ---- Ventana ---- */
 function createWindow() {
   // Buscar ícono: primero logo.png (dev), luego build/icon.ico (producción)
@@ -405,50 +409,26 @@ function createWindow() {
 
 /* ---- Auto-actualizaciones automáticas desde GitHub Releases ---- */
 function setupAutoUpdater() {
-  if (!app.isPackaged) return; // En modo desarrollo no busca updates
+  if (!app.isPackaged) return;
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
-  autoUpdater.on("checking-for-update", () => {
-    status("Buscando actualizaciones del launcher...");
-  });
-
-  autoUpdater.on("update-available", (info) => {
-    status(`Descargando actualización v${info.version}...`);
-  });
-
-  autoUpdater.on("download-progress", (p) => {
-    const pct = Math.round(p.percent || 0);
-    status(`Descargando nueva versión: ${pct}%`);
-  });
-
-  autoUpdater.on("update-downloaded", (info) => {
-    status(`Launcher v${info.version} listo para instalar.`);
-    if (win && !win.isDestroyed()) {
-      dialog
-        .showMessageBox(win, {
-          type: "info",
-          title: "Actualización disponible",
-          message: `Se descargó una nueva versión del Launcher (v${info.version}).\n\n¿Quieres reiniciar ahora para actualizarlo?`,
-          buttons: ["Reiniciar y actualizar", "Más tarde"],
-          defaultId: 0,
-        })
-        .then((choice) => {
-          if (choice.response === 0) {
-            autoUpdater.quitAndInstall();
-          }
-        });
-    }
-  });
-
+  autoUpdater.on("checking-for-update", () => send("update", { state: "checking" }));
+  autoUpdater.on("update-not-available", () => send("update", { state: "none" }));
+  autoUpdater.on("update-available", (info) =>
+    send("update", { state: "downloading", version: info.version, pct: 0 }));
+  autoUpdater.on("download-progress", (p) =>
+    send("update", { state: "downloading", pct: Math.round(p.percent || 0) }));
+  autoUpdater.on("update-downloaded", (info) =>
+    send("update", { state: "ready", version: info.version }));
   autoUpdater.on("error", (err) => {
     console.warn("AutoUpdater warning:", err.message);
+    send("update", { state: "none" });
   });
 
-  // Comprobar actualizaciones a los 3 segundos de abrir
   setTimeout(() => {
-    autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+    autoUpdater.checkForUpdates().catch(() => {});
   }, 3000);
 }
 

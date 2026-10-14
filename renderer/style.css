@@ -256,3 +256,39 @@ h3 { margin: 0; font-size: 16px; font-weight: normal; letter-spacing: 1px; color
 .menuitem { all: unset; box-sizing: border-box; cursor: pointer; padding: 9px 14px;
             transition: background 0.12s, color 0.12s, padding-left 0.12s; }
 .menuitem:hover { background: rgba(255, 255, 255, 0.12); color: var(--accent); padding-left: 17px; }
+
+/* ====== Aviso de actualización (abajo a la derecha) ====== */
+#updateBanner {
+  position: fixed; right: 16px; bottom: 16px; z-index: 1000; width: 300px;
+  display: flex; flex-direction: column; gap: 10px; padding: 14px 16px;
+  color: #fff; text-shadow: 2px 2px 0 #000;
+  background: var(--panel); border: 2px solid #000; backdrop-filter: blur(6px);
+  box-shadow: inset 2px 2px 0 var(--edge), inset -2px -2px 0 var(--edge-dark), 4px 4px 0 rgba(0, 0, 0, 0.6);
+
+  /* animación: entra desde abajo con un pequeño rebote */
+  opacity: 0; transform: translateY(36px); pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#updateBanner.show { opacity: 1; transform: none; pointer-events: auto; }
+#updateText { text-align: center; }
+
+/* barra de progreso con el mismo estilo que la de carga del juego */
+.upd-bar { height: 22px; padding: 3px; background: rgba(0, 0, 0, 0.7); border: 2px solid #000;
+           box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.18); }
+#updateFill { height: 100%; width: 0%; transition: width 0.25s steps(8);
+              background: repeating-linear-gradient(90deg, var(--accent) 0 8px, transparent 8px 11px); }
+
+/* botones: mismas imágenes que Jugar (amarillo) y la barra lateral (negro) */
+.upd-btns { display: flex; flex-direction: column; gap: 6px; }
+.upd-btn { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; justify-content: center;
+           min-height: 44px; text-align: center; border-style: solid; image-rendering: pixelated;
+           transition: filter 0.1s, transform 0.1s; }
+.upd-play { color: #2b1b00; text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.35);
+            border-width: 10px; border-image: url("assets/ui/btn-play.png") 5 fill / 10px stretch;
+            animation: upd-pulse 1.6s ease-in-out infinite; }
+.upd-nav  { color: var(--text);
+            border-width: 8px; border-image: url("assets/ui/btn-nav.png") 4 fill / 8px stretch; }
+.upd-btn:hover { filter: brightness(1.2); }
+.upd-btn:active { transform: translateY(1px); }
+.upd-btn:disabled { filter: grayscale(1) brightness(0.8); opacity: 0.6; cursor: not-allowed; animation: none; }
+@keyframes upd-pulse { 50% { filter: brightness(1.2); } }
