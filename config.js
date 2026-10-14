@@ -26,7 +26,7 @@ module.exports = {
 
   // ---- Apariencia (lo que se ve en la ventana) ----
   branding: {
-    title: "Mi Launcher",
+    title: "Launcher Insano",
     subtitle: "El Mejor Launcher xdd",
     accentColor: "#d4b112",       // color del botón Jugar y de la barra (formato #rrggbb)
     news: [
