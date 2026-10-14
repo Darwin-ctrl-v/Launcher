@@ -430,7 +430,7 @@ function setupAutoUpdater() {
         .showMessageBox(win, {
           type: "info",
           title: "Actualización disponible",
-          message: `Se descargó una nueva versión de Mi Launcher (v${info.version}).\n\n¿Quieres reiniciar ahora para actualizarlo?`,
+          message: `Se descargó una nueva versión del Launcher (v${info.version}).\n\n¿Quieres reiniciar ahora para actualizarlo?`,
           buttons: ["Reiniciar y actualizar", "Más tarde"],
           defaultId: 0,
         })
