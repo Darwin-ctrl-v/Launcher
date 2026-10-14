@@ -1,12 +1,13 @@
 {
   "name": "mi-launcher",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Launcher personalizado de Minecraft (Fabric)",
   "author": "Darwin",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win"
+    "build": "electron-builder --win",
+    "release": "electron-builder --win --publish always"
   },
   "license": "MIT",
   "build": {
@@ -16,7 +17,8 @@
       {
         "provider": "github",
         "owner": "Darwin-ctrl-v",
-        "repo": "Launcher-mc"
+        "repo": "Launcher-mc",
+        "releaseType": "release"
       }
     ],
     "directories": {
@@ -31,10 +33,7 @@
     ],
     "win": {
       "icon": "renderer/assets/logo.png",
-      "target": [
-        "nsis",
-        "portable"
-      ]
+      "target": ["nsis"]
     },
     "nsis": {
       "oneClick": false,
