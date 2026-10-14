@@ -1,0 +1,34 @@
+name: Compilar y Publicar Launcher
+
+on:
+  push:
+    # Se ejecuta automáticamente cada vez que subes un cambio de versión (tag como v0.2.1, v0.2.2, etc.)
+    tags:
+      - 'v*'
+  # También permite compilar manualmente desde la pestaña "Actions" en GitHub con un solo clic
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar instalador y publicar en GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --publish always

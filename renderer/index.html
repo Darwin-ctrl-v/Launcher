@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: blob: https://cdn.modrinth.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval' blob:; worker-src blob:" />
+  <title>Mi Launcher</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Fondo: escena animada (background.js). Si existe assets/background.jpg se usa esa imagen -->
+  <div class="bg">
+    <canvas id="bg"></canvas>
+    <div class="bgimg"></div>
+    <div class="shade"></div>
+  </div>
+
+  <div class="app">
+    <!-- ============ BARRA LATERAL ============ -->
+    <aside class="side">
+      <div class="brand">
+        <img id="logo" class="logo" src="assets/logo.png" alt="" />
+        <h1 id="title">Mi Launcher</h1>
+        <p id="subtitle" class="subtitle"></p>
+      </div>
+
+      <nav class="nav">
+        <button class="navbtn active" data-view="play">Jugar</button>
+        <button class="navbtn" data-view="mods">Mods</button>
+        <button class="navbtn" data-view="options">Opciones</button>
+      </nav>
+
+      <div class="skin">
+        <div id="skinBox" class="skinbox empty" title="Click para cambiar tu skin y tu capa">
+          <div id="skinViewerContainer" class="skin-viewer-container"></div>
+          <span class="qmark">?</span>
+        </div>
+        <div class="userrow">
+          <div id="userName" class="uname">Sin sesión</div>
+          <button id="menuBtn" class="burger" aria-label="Menú" title="Menú">
+            <span class="burger-line"></span>
+            <span class="burger-line"></span>
+            <span class="burger-line"></span>
+          </button>
+          <div id="menu" class="menu" hidden>
+            <button id="menuAuth" class="menuitem">Iniciar sesión</button>
+            <button id="menuLog" class="menuitem">Registro</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============ ZONA PRINCIPAL ============ -->
+    <main class="main">
+      <!-- JUGAR -->
+      <section class="view active" id="view-play">
+        <div class="play-wrap">
+          <div id="idleBox" class="idle">
+            <button id="playBtn">JUGAR</button>
+            <div id="meta" class="meta"></div>
+          </div>
+
+          <div id="loadBox" class="loading" hidden>
+            <div class="loadtitle"><span id="loadText">CARGANDO</span><span class="dots">...</span></div>
+            <div class="pbar"><div id="fill"></div></div>
+            <div id="pct" class="pct">0%</div>
+          </div>
+
+          <div id="status" class="status"></div>
+        </div>
+      </section>
+
+      <!-- MODS -->
+      <section class="view" id="view-mods">
+        <div class="panel">
+          <div class="phead">
+            <h2 id="modsTitle">MODS</h2>
+            <input id="modFilter" type="text" placeholder="buscar..." spellcheck="false" />
+          </div>
+          <ul id="modList" class="modlist"></ul>
+          <p id="modsHint" class="hint"></p>
+        </div>
+      </section>
+
+      <!-- OPCIONES -->
+      <section class="view" id="view-options">
+        <div class="panel options-panel">
+          <h2>OPCIONES</h2>
+
+          <!-- Sección RAM -->
+          <div class="opt-section">
+            <h3>Memoria RAM</h3>
+            <div id="ramValue" class="bigval">4 GB</div>
+            <input id="ramSlider" type="range" min="1024" max="8192" step="512" value="4096" />
+            <div class="range-labels"><span id="ramMin"></span><span id="ramMax"></span></div>
+            <p id="ramInfo" class="hint"></p>
+            <p id="ramNote" class="hint"></p>
+          </div>
+
+          <!-- Sección Resolución -->
+          <div class="opt-section">
+            <h3>Resolución del juego</h3>
+            <div class="res-row">
+              <div class="res-field">
+                <label for="resWidth">Ancho</label>
+                <input id="resWidth" type="number" min="640" max="3840" step="1" value="854" />
+              </div>
+              <span class="res-x">×</span>
+              <div class="res-field">
+                <label for="resHeight">Alto</label>
+                <input id="resHeight" type="number" min="360" max="2160" step="1" value="480" />
+              </div>
+              <button id="resReset" class="btn btn-small" title="Restaurar resolución por defecto">Reset</button>
+            </div>
+            <div class="res-presets">
+              <button class="btn btn-small res-preset" data-w="854" data-h="480">854×480</button>
+              <button class="btn btn-small res-preset" data-w="1280" data-h="720">1280×720</button>
+              <button class="btn btn-small res-preset" data-w="1920" data-h="1080">1920×1080</button>
+            </div>
+            <p class="hint">Se aplica la próxima vez que pulses JUGAR.</p>
+          </div>
+
+          <!-- Sección Java -->
+          <div class="opt-section">
+            <h3>Java</h3>
+            <div class="java-field">
+              <label for="javaPath">Ruta de Java</label>
+              <input id="javaPath" type="text" placeholder="Auto-detectado" spellcheck="false" readonly />
+            </div>
+            <div class="java-field">
+              <label for="jvmArgs">Argumentos JVM extra</label>
+              <input id="jvmArgs" type="text" placeholder="Ej: -XX:+UseG1GC" spellcheck="false" />
+            </div>
+            <p class="hint">Deja la ruta vacía para auto-detectar Java. Los argumentos se añaden al lanzar el juego.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SKIN Y CAPA -->
+      <section class="view" id="view-skin">
+        <div class="panel wide">
+          <div class="phead">
+            <h2>SKIN Y CAPA</h2>
+            <button id="skinBack" class="link">&lt; volver</button>
+          </div>
+          <div class="skincols">
+            <div id="stage" class="stage">
+              <div id="bigViewerContainer" class="big-viewer-container"></div>
+            </div>
+            <div class="controls">
+              <h3>SKIN</h3>
+              <div class="row">
+                <button id="pickSkin" class="btn">Elegir PNG...</button>
+                <button id="varClassic" class="btn tog active">Classic</button>
+                <button id="varSlim" class="btn tog">Slim</button>
+              </div>
+              <div id="pendingBox" hidden>
+                <div id="pendingName" class="hint"></div>
+                <div class="row">
+                  <button id="applySkin" class="btn primary">APLICAR</button>
+                  <button id="cancelSkin" class="btn">Cancelar</button>
+                </div>
+              </div>
+              <h3>CAPA</h3>
+              <div id="capeGrid" class="capegrid"></div>
+              <div id="skinMsg" class="hint"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- REGISTRO -->
+      <section class="view" id="view-log">
+        <pre id="log"></pre>
+      </section>
+    </main>
+  </div>
+
+  <script src="background.js"></script>
+  <script src="skinview3d.bundle.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+Guarda aqui el archivo de la fuente Fixedsys con el nombre exacto:  fixedsys.ttf
+(Si no esta, el launcher usa una fuente monoespaciada parecida.) Puedes borrar este archivo.

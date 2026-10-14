@@ -1,0 +1,258 @@
+/* ====== FUENTE ======
+   Guarda la fuente "Fixedsys Excelsior" como renderer/assets/fonts/fixedsys.ttf
+   (si no está, se usa una fuente monoespaciada parecida). */
+@font-face {
+  font-family: "FixedsysLauncher";
+  src: url("assets/fonts/fixedsys.ttf") format("truetype"),
+       url("assets/fonts/fixedsys.otf") format("opentype"),
+       url("assets/fonts/fixedsys.woff2") format("woff2"),
+       local("Fixedsys Excelsior 3.01"),
+       local("Fixedsys Excelsior");
+}
+
+/* ====== AJUSTES RÁPIDOS: cambia estos valores ====== */
+:root {
+  --accent: #4cc38a;          /* se sobrescribe con config.js -> branding.accentColor */
+  --accent-text: #06140d;     /* color del texto sobre el botón (se calcula solo) */
+  --panel: rgba(14, 12, 30, 0.80);   /* fondo de paneles y barra lateral */
+  --edge: rgba(255, 255, 255, 0.20); /* borde claro (esquina superior) */
+  --edge-dark: rgba(0, 0, 0, 0.55);  /* borde oscuro (esquina inferior) */
+  --text: #f4f1ff;
+  --muted: #a89fc4;
+  --danger: #ff7a7a;
+  --pp: 4px;                 /* tamaño de cada píxel del botón Jugar */
+  --np: 3px;                 /* tamaño de cada píxel de los botones laterales */
+  --font: "FixedsysLauncher", "Fixedsys Excelsior", "Lucida Console", Consolas, monospace;
+}
+/* ==================================================== */
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { font-family: var(--font); font-size: 16px; line-height: 1.25; color: var(--text);
+       background: #0b0a18; overflow: hidden; user-select: none; text-rendering: optimizeSpeed; }
+button, input { font-family: inherit; font-size: inherit; color: inherit; }
+
+/* ---- Fondo ---- */
+.bg { position: fixed; inset: 0; background: #0b0a18; }
+#bg { width: 100%; height: 100%; display: block; object-fit: cover; image-rendering: pixelated; }
+.bgimg { position: absolute; inset: 0; display: none; background: url("assets/background.jpg") center / cover no-repeat; }
+body.has-image .bgimg { display: block; }
+body.has-image #bg { display: none; }
+.shade { position: absolute; inset: 0;
+         background: linear-gradient(90deg, rgba(8, 6, 20, 0.55) 0%, rgba(8, 6, 20, 0.12) 38%, rgba(8, 6, 20, 0) 100%),
+                     linear-gradient(180deg, rgba(8, 6, 20, 0) 55%, rgba(8, 6, 20, 0.5) 100%); }
+
+/* ---- Estructura ---- */
+.app { position: relative; height: 100%; display: grid; grid-template-columns: 232px 1fr; }
+
+/* Bloques con bordes "biselados" estilo Minecraft */
+.side, .panel, .skinbox, #modFilter {
+  box-shadow: inset 2px 2px 0 var(--edge), inset -2px -2px 0 var(--edge-dark);
+}
+
+/* ---- Barra lateral ---- */
+.side { min-height: 0; overflow: visible; position: relative; z-index: 50; display: flex; flex-direction: column; gap: 18px; padding: 20px 16px;
+        background: var(--panel); border-right: 2px solid #000; backdrop-filter: blur(6px); }
+.brand { text-align: center; }
+.logo { max-width: 100%; max-height: 90px; object-fit: contain; margin-bottom: 8px; image-rendering: pixelated; }
+h1 { margin: 0; font-size: 32px; font-weight: normal; line-height: 1; overflow-wrap: anywhere;
+     color: var(--accent); text-shadow: 3px 3px 0 #000; }
+.subtitle { margin: 8px 0 0; color: var(--muted); font-size: 16px; }
+
+.nav { display: flex; flex-direction: column; gap: 4px; }
+/* Botones de la barra lateral: usan la imagen assets/ui/btn-nav.png (9 zonas, el centro se estira) */
+.navbtn { all: unset; box-sizing: border-box; display: block; cursor: pointer;
+          padding: 0; text-align: center; color: var(--text);
+          border-style: solid; border-width: calc(var(--np) * 4);
+          border-image: url("assets/ui/btn-nav.png") 4 fill / calc(var(--np) * 4) stretch;
+          image-rendering: pixelated; transition: filter 0.1s; }
+.navbtn:hover { filter: brightness(1.35); }
+.navbtn.active { color: var(--accent); filter: brightness(1.15); }
+.tag { float: right; color: var(--muted); }
+
+.skin { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; }
+.skinbox { position: relative; flex: 1 1 0; min-height: 80px; max-height: 230px; width: 100%; overflow: hidden;
+           display: grid; place-items: center; font-size: 32px; color: var(--muted); background: rgba(0, 0, 0, 0.30); }
+.uname { font-size: 16px; overflow-wrap: anywhere; text-align: center; }
+.link { all: unset; cursor: pointer; color: var(--muted); }
+.link:hover { color: var(--accent); text-decoration: underline; }
+
+/* ---- Zona principal ---- */
+.main { position: relative; min-width: 0; min-height: 0; }
+.view { display: none; position: absolute; inset: 0; padding: 28px; overflow: auto; }
+.view.active { display: block; }
+
+/* Jugar */
+.play-wrap { position: absolute; left: 0; right: 0; bottom: 56px; display: flex; flex-direction: column;
+             align-items: center; gap: 14px; }
+.idle { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.meta { color: #fff; text-shadow: 2px 2px 0 #000; }
+
+/* Botón Jugar: usa la imagen assets/ui/btn-play.png (9 zonas, el centro se estira) */
+#playBtn { cursor: pointer; width: 340px; padding: 8px 0; font-size: 32px; letter-spacing: 2px;
+           color: #2b1b00; text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.35); background: none;
+           border-style: solid; border-width: calc(var(--pp) * 5);
+           border-image: url("assets/ui/btn-play.png") 5 fill / calc(var(--pp) * 5) stretch;
+           image-rendering: pixelated; transition: transform 0.1s, filter 0.1s; }
+#playBtn:hover { filter: brightness(1.12); transform: translateY(-2px); }
+#playBtn:active { transform: translateY(1px); }
+
+/* Modo carga */
+.loading { width: min(520px, 86%); display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.loadtitle { font-size: 32px; text-align: center; color: #fff; text-shadow: 3px 3px 0 #000; }
+.dots { display: inline-block; width: 3ch; overflow: hidden; vertical-align: bottom; white-space: nowrap;
+        animation: dots 1.2s steps(4) infinite; text-align: left; }
+@keyframes dots { from { width: 0; } to { width: 3ch; } }
+.pbar { height: 34px; padding: 4px; background: rgba(0, 0, 0, 0.7); border: 2px solid #000;
+        box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.18); }
+#fill { height: 100%; width: 0%; transition: width 0.25s steps(8);
+        background: repeating-linear-gradient(90deg, var(--accent) 0 14px, transparent 14px 18px); }
+.pct { text-align: center; color: #fff; text-shadow: 2px 2px 0 #000; }
+
+.status { min-height: 20px; max-width: 80%; text-align: center; color: #fff; text-shadow: 2px 2px 0 #000; }
+.status.bad { color: var(--danger); }
+
+/* Paneles (Mods, Opciones) */
+.panel { max-width: 640px; max-height: 100%; display: flex; flex-direction: column; gap: 14px; padding: 18px 20px;
+         background: var(--panel); border: 2px solid #000; backdrop-filter: blur(6px); }
+.panel.narrow { max-width: 480px; }
+h2 { margin: 0; font-size: 16px; font-weight: normal; letter-spacing: 1px; color: var(--accent); }
+.hint { margin: 0; color: var(--muted); }
+.phead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+#modFilter { width: 200px; padding: 6px 8px; background: rgba(0, 0, 0, 0.45); border: 2px solid #000; outline: none; user-select: text; }
+#modFilter:focus { border-color: var(--accent); }
+.modlist { list-style: none; margin: 0; padding: 0; overflow: auto; min-height: 0; max-height: 380px; }
+.modlist li { display: flex; align-items: center; gap: 12px; padding: 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.modlist li:hover { background: rgba(255, 255, 255, 0.06); }
+.modlist .ver { color: var(--muted); white-space: nowrap; }
+.mname { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.mico { width: 32px; height: 32px; flex: none; display: grid; place-items: center; overflow: hidden; color: var(--muted);
+        background: rgba(0, 0, 0, 0.35); box-shadow: inset 2px 2px 0 var(--edge), inset -2px -2px 0 var(--edge-dark); }
+.mico img { width: 100%; height: 100%; object-fit: cover; }
+.modlist .lib { color: var(--accent); margin-left: 8px; }
+.modlist::-webkit-scrollbar { width: 10px; }
+.modlist::-webkit-scrollbar-thumb { background: var(--muted); }
+.modlist::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.4); }
+
+/* ====== Panel de Opciones ====== */
+.options-panel { max-width: 540px; overflow: auto; max-height: calc(100vh - 56px); }
+.opt-section { padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.opt-section:last-child { border-bottom: none; }
+.opt-section h3 { margin: 0 0 10px 0; }
+
+/* RAM */
+.bigval { font-size: 32px; color: #fff; text-shadow: 3px 3px 0 #000; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 16px; background: rgba(0, 0, 0, 0.6);
+                    border: 2px solid #000; outline: none; cursor: pointer; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 28px; background: var(--accent);
+                    border: 2px solid #000; box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.45); }
+.range-labels { display: flex; justify-content: space-between; color: var(--muted); }
+
+/* Resolución */
+.res-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.res-field { display: flex; flex-direction: column; gap: 2px; }
+.res-field label { font-size: 12px; color: var(--muted); }
+.res-field input { width: 90px; padding: 6px 8px; background: rgba(0, 0, 0, 0.45); border: 2px solid #000;
+                   outline: none; user-select: text; text-align: center;
+                   box-shadow: inset 2px 2px 0 var(--edge), inset -2px -2px 0 var(--edge-dark); }
+.res-field input:focus { border-color: var(--accent); }
+.res-x { font-size: 20px; color: var(--muted); margin-top: 14px; }
+.res-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.btn-small { padding: 4px 10px; font-size: 14px; }
+.res-preset { }
+
+/* Java */
+.java-field { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.java-field label { font-size: 12px; color: var(--muted); }
+.java-field input { width: 100%; padding: 6px 8px; background: rgba(0, 0, 0, 0.45); border: 2px solid #000;
+                    outline: none; user-select: text;
+                    box-shadow: inset 2px 2px 0 var(--edge), inset -2px -2px 0 var(--edge-dark); }
+.java-field input:focus { border-color: var(--accent); }
+.java-field input[readonly] { color: var(--muted); cursor: default; }
+
+/* Registro */
+#log { position: absolute; inset: 28px; margin: 0; padding: 12px; overflow: auto; background: rgba(6, 5, 14, 0.92);
+       border: 2px solid #000; box-shadow: inset 2px 2px 0 var(--edge); color: #cfc8e6; white-space: pre-wrap; user-select: text; }
+
+
+/* ====== Skin 3D (skinview3d) ====== */
+.skinbox { cursor: pointer; }
+.skin-viewer-container { position: absolute; inset: 4px; width: calc(100% - 8px); height: calc(100% - 8px); }
+.skin-viewer-container canvas { display: block; width: 100% !important; height: 100% !important; }
+.skinbox .qmark { display: none; }
+.skinbox.empty .skin-viewer-container { visibility: hidden; }
+.skinbox.empty .qmark { display: block; }
+
+/* ====== Panel Skin y capa ====== */
+.panel.wide { max-width: 720px; overflow: auto; }
+.skincols { display: grid; grid-template-columns: 240px 1fr; gap: 20px; }
+.stage { position: relative; height: 350px; overflow: hidden; background: rgba(0, 0, 0, 0.30);
+         box-shadow: inset 2px 2px 0 var(--edge), inset -2px -2px 0 var(--edge-dark); }
+.big-viewer-container { position: absolute; inset: 8px; width: calc(100% - 16px); height: calc(100% - 16px); }
+.big-viewer-container canvas { display: block; width: 100% !important; height: 100% !important; }
+.stagebtns { position: absolute; left: 0; right: 0; bottom: 8px; display: flex; justify-content: center; gap: 8px; z-index: 2; }
+.controls { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+h3 { margin: 0; font-size: 16px; font-weight: normal; letter-spacing: 1px; color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { cursor: pointer; padding: 8px 12px; background: rgba(255, 255, 255, 0.08); border: 2px solid #000;
+       box-shadow: inset 2px 2px 0 var(--edge), inset -2px -2px 0 var(--edge-dark); }
+.btn:hover { filter: brightness(1.25); }
+.btn.tog.active, .btn.primary { background: var(--accent); color: var(--accent-text); }
+.capegrid { display: flex; flex-wrap: wrap; gap: 8px; }
+.cape { cursor: pointer; width: 96px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+        background: rgba(255, 255, 255, 0.06); border: 2px solid #000;
+        box-shadow: inset 2px 2px 0 var(--edge), inset -2px -2px 0 var(--edge-dark); }
+.cape:hover { background: rgba(255, 255, 255, 0.14); }
+.cape.active { outline: 2px solid var(--accent); }
+.cape canvas { width: 40px; height: 64px; image-rendering: pixelated; background: rgba(0, 0, 0, 0.3); }
+.cape .cname { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hint.bad { color: var(--danger); }
+
+
+/* ====== Nombre de usuario + menú hamburguesa ====== */
+.userrow { position: relative; display: flex; align-items: center; gap: 8px; width: 100%; }
+.uname { flex: 1; min-width: 0; text-align: left; overflow-wrap: anywhere; }
+
+/* Hamburguesa: 3 barras perfectamente centradas con animación de apertura */
+.burger { all: unset; box-sizing: border-box; cursor: pointer; flex: none;
+          width: 36px; height: 32px;
+          display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+          border: 2px solid #000;
+          background: rgba(255, 255, 255, 0.08);
+          box-shadow: inset 2px 2px 0 var(--edge), inset -2px -2px 0 var(--edge-dark);
+          transition: background 0.15s, border-color 0.15s, filter 0.1s; }
+.burger:hover { filter: brightness(1.3); }
+.burger.open { background: rgba(255, 255, 255, 0.18); border-color: var(--accent); }
+
+.burger-line { display: block; width: 18px; height: 2px; background: var(--text); border-radius: 0; flex: none;
+               transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease; }
+
+/* Animación de las 3 líneas a una X cuando el menú está abierto */
+.burger.open .burger-line:nth-child(1) { transform: translateY(5px) rotate(45deg); }
+.burger.open .burger-line:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.burger.open .burger-line:nth-child(3) { transform: translateY(-5px) rotate(-45deg); }
+
+/* Menú: se abre hacia la DERECHA, hacia el área principal del launcher */
+.menu { position: absolute; left: calc(100% + 20px); bottom: 0; z-index: 100; min-width: 190px; padding: 4px;
+        display: flex; flex-direction: column; background: rgba(10, 8, 22, 0.97); border: 2px solid #000;
+        box-shadow: inset 2px 2px 0 var(--edge), inset -2px -2px 0 var(--edge-dark), 4px 4px 0 rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(8px);
+        transform-origin: left bottom;
+        animation: menuOpenRight 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+@keyframes menuOpenRight {
+  0% {
+    opacity: 0;
+    transform: translateX(-16px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.menuitem { all: unset; box-sizing: border-box; cursor: pointer; padding: 9px 14px;
+            transition: background 0.12s, color 0.12s, padding-left 0.12s; }
+.menuitem:hover { background: rgba(255, 255, 255, 0.12); color: var(--accent); padding-left: 17px; }

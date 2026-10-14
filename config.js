@@ -1,0 +1,37 @@
+// Configuración del launcher.
+// Si cambias algo aquí y ya generaste el .exe, hay que volver a generarlo (npm run build).
+module.exports = {
+  appName: "MiLauncher",          // nombre de la carpeta donde se guarda el juego
+  minecraft: "1.21.1",
+  loader: "fabric",
+
+  // URL del archivo mods.json en GitHub (enlace "Raw").
+  // Si pones tu enlace aquí, el launcher descargará la lista de mods directamente desde GitHub cada vez que juegues.
+  // Así puedes añadir o quitar mods desde GitHub sin tener que volver a compilar el launcher.
+  // Ejemplo: "https://raw.githubusercontent.com/TuUsuario/TuRepositorio/main/mods.json"
+  modsUrl: "https://gist.githubusercontent.com/Darwin-ctrl-v/efe67e29582bc129f9bd4fe40b952f41/raw/mods.json",
+
+  // Mods por defecto (o de respaldo si no hay conexión a GitHub):
+  mods: [
+    "sodium",
+    "lithium",
+    "iris",
+    "ok-zoomer",
+    "modmenu",
+    "ferrite-core",
+  ],
+  userAgent: "tunombre/mi-launcher/0.2.0", // CAMBIA ESTO por algo tuyo (lo pide Modrinth)
+  ram: { min: "2G", max: "4G" },
+  javaMajor: 21,                  // Minecraft 1.21.1 necesita Java 21
+
+  // ---- Apariencia (lo que se ve en la ventana) ----
+  branding: {
+    title: "Mi Launcher",
+    subtitle: "El Mejor Launcher xdd",
+    accentColor: "#d4b112",       // color del botón Jugar y de la barra (formato #rrggbb)
+    news: [
+      "¡Bienvenidos! Esta es la primera versión del launcher.",
+      "Por ahora incluye Sodium. Pronto, más mods.",
+    ],
+  },
+};
