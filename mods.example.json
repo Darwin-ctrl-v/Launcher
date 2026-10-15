@@ -1,0 +1,21 @@
+{
+  "instances": [
+    {
+      "id": "principal",
+      "name": "Principal",
+      "image": "https://raw.githubusercontent.com/Darwin-ctrl-v/Launcher-mc/main/instalaciones/principal.png",
+      "description": "El modpack de siempre",
+      "minecraft": "1.21.1",
+      "loader": "fabric",
+      "mods": ["sodium", "lithium", "iris", "ok-zoomer", "modmenu", "ferrite-core"]
+    },
+    {
+      "id": "survival-1-20",
+      "name": "Survival 1.20.1",
+      "image": "https://raw.githubusercontent.com/Darwin-ctrl-v/Launcher-mc/main/instalaciones/survival-1-20.png",
+      "minecraft": "1.20.1",
+      "loader": "fabric",
+      "mods": ["sodium", "lithium"]
+    }
+  ]
+}

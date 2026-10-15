@@ -3,6 +3,7 @@ const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const crypto = require("crypto");
 const config = require("./config");
 const L = require("./launcher");
 
@@ -10,7 +11,13 @@ let win;
 let session = null; // { auth, saved, name }
 let playing = false;
 
-const gameDir = () => path.join(app.getPath("appData"), config.appName, "game");
+// Carpeta compartida por todas las instalaciones (assets, librerías y versiones de Minecraft)
+const rootDir = () => path.join(app.getPath("appData"), config.appName, "game");
+// Carpeta propia de cada instalación (mods, mundos, opciones). La "principal" sigue usando la carpeta de siempre.
+const instanceDir = (inst) =>
+  inst.id === L.LEGACY_ID ? rootDir() : path.join(app.getPath("appData"), config.appName, "instances", inst.id);
+const instancesFile = () => path.join(app.getPath("userData"), "instances-cache.json");
+const imagesDir = () => path.join(app.getPath("userData"), "instance-images");
 const sessionFile = () => path.join(app.getPath("userData"), "session.bin");
 const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
 
@@ -136,12 +143,101 @@ ipcMain.handle("branding", () => ({
   loader: config.loader,
 }));
 
-ipcMain.handle("mods:list", async () => {
-  const slugs = await L.getModSlugs();
-  const manifest = L.readModsManifest(gameDir());
+/* ---- Instalaciones (las define tu Gist) ---- */
+let instancesMem = [];
+
+async function loadInstances() {
+  let offline = false;
+  try {
+    instancesMem = await L.fetchInstances();
+    try { fs.writeFileSync(instancesFile(), JSON.stringify({ instances: instancesMem })); } catch {}
+  } catch (e) {
+    offline = true;
+    console.warn("No se pudieron leer las instalaciones del Gist:", e.message);
+    let cached = null;
+    try { cached = L.normalizeInstances(JSON.parse(fs.readFileSync(instancesFile(), "utf8"))); } catch {}
+    instancesMem = cached || L.fallbackInstances();
+  }
+  return { instances: instancesMem, offline };
+}
+
+function pickSelected(list) {
+  const saved = loadSettings().instance;
+  return list.some((i) => i.id === saved) ? saved : list[0].id;
+}
+
+function sniffImage(buf) {
+  if (buf.length > 12) {
+    if (buf.subarray(0, 8).toString("hex") === "89504e470d0a1a0a") return "image/png";
+    if (buf[0] === 0xff && buf[1] === 0xd8) return "image/jpeg";
+    if (buf.subarray(0, 3).toString("latin1") === "GIF") return "image/gif";
+    if (buf.subarray(0, 4).toString("latin1") === "RIFF" && buf.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
+  }
+  return null;
+}
+
+// La imagen se descarga aquí (no en la ventana) y se guarda una copia para verla también sin conexión
+const imageCache = new Map();
+async function imageDataUrl(url) {
+  if (imageCache.has(url)) return imageCache.get(url);
+  const file = path.join(imagesDir(), crypto.createHash("sha1").update(url).digest("hex") + ".img");
+  let buf = null;
+  try {
+    const res = await fetch(new URL(url.replace(/^http:/i, "https:")), {
+      headers: { "User-Agent": config.userAgent },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) {
+      const b = Buffer.from(await res.arrayBuffer());
+      if (b.length <= 4 * 1024 * 1024 && sniffImage(b)) {
+        buf = b;
+        try { fs.mkdirSync(imagesDir(), { recursive: true }); fs.writeFileSync(file, b); } catch {}
+      }
+    }
+  } catch {}
+  if (!buf) { try { buf = fs.readFileSync(file); } catch {} }
+  const type = buf && sniffImage(buf);
+  if (!type) return null;
+  const data = `data:${type};base64,` + buf.toString("base64");
+  imageCache.set(url, data);
+  return data;
+}
+
+ipcMain.handle("instances:list", async () => {
+  const { instances, offline } = await loadInstances();
+  return {
+    offline,
+    selected: pickSelected(instances),
+    instances: instances.map((i) => ({
+      id: i.id, name: i.name, minecraft: i.minecraft, loader: i.loader, description: i.description, hasImage: !!i.image,
+    })),
+  };
+});
+
+ipcMain.handle("instances:select", (_e, id) => {
+  if (!instancesMem.some((i) => i.id === id)) return false;
+  saveSettings({ instance: id });
+  return true;
+});
+
+ipcMain.handle("instances:image", async (_e, id) => {
+  const inst = instancesMem.find((i) => i.id === id);
+  return inst && inst.image ? imageDataUrl(inst.image) : null;
+});
+
+ipcMain.handle("mods:list", async (_e, id) => {
+  let inst = instancesMem.find((i) => i.id === id);
+  if (!inst) {
+    await loadInstances();
+    inst = instancesMem.find((i) => i.id === id);
+  }
+  if (!inst) return { items: [], pending: false };
+
+  const baseSlug = (s) => String(s).split(/[@:]/)[0].trim();
+  const manifest = L.readModsManifest(instanceDir(inst));
   const items = manifest
     ? manifest.map((m) => ({ title: m.title, slug: m.slug, version: m.version, lib: m.dependency, icon: m.icon || null }))
-    : slugs.map((s) => ({ title: s, slug: s, version: "", lib: false, icon: null }));
+    : inst.mods.map((s) => ({ title: baseSlug(s), slug: baseSlug(s), version: "", lib: false, icon: null }));
 
   if (items.some((i) => !i.icon)) {
     try {
@@ -184,7 +280,7 @@ ipcMain.handle("logout", async () => {
   return true;
 });
 
-ipcMain.handle("play", async () => {
+ipcMain.handle("play", async (_e, instId) => {
   if (playing) return { ok: false, error: "Minecraft ya se está ejecutando." };
   playing = true;
   send("state", "loading");
@@ -197,23 +293,34 @@ ipcMain.handle("play", async () => {
 
   try {
     setPct(2);
+    status("Comprobando instalaciones...");
+    const { instances } = await loadInstances(); // trae la lista de mods más reciente del Gist
+    const inst = instances.find((i) => i.id === instId) || instances.find((i) => i.id === pickSelected(instances));
+    if (!inst) throw new Error("No hay ninguna instalación disponible.");
+    if (inst.loader !== "fabric") {
+      throw new Error(`"${inst.name}" usa ${inst.loader}, y por ahora el launcher solo admite Fabric.`);
+    }
+    saveSettings({ instance: inst.id });
+
     const s = await ensureLogin(true);
     setPct(8);
 
-    status("Buscando Java 21...");
-    const javaPath = await L.findJava();
+    const major = L.javaMajorFor(inst.minecraft, inst.java);
+    status(`Buscando Java ${major}...`);
+    const javaPath = await L.findJava(major);
     if (!javaPath) {
-      throw new Error("No se encontró Java 21. Instala Temurin 21 desde https://adoptium.net y vuelve a intentar.");
+      throw new Error(`No se encontró Java ${major} (lo necesita Minecraft ${inst.minecraft}). Instala Temurin ${major} desde https://adoptium.net y vuelve a intentar.`);
     }
     setPct(12);
 
-    const dir = gameDir();
-    status("Preparando Fabric...");
-    const fabricId = await L.ensureFabric(dir);
+    const root = rootDir();
+    const dir = instanceDir(inst);
+    status(`Preparando Fabric para ${inst.minecraft}...`);
+    const fabricId = await L.ensureFabric(root, inst.minecraft);
     setPct(18);
 
     status("Comprobando mods...");
-    await L.syncMods(dir, status, (r) => setPct(18 + r * 22));
+    await L.syncMods(dir, inst, status, (r) => setPct(18 + r * 22));
     setPct(40);
 
     status("Descargando y preparando Minecraft...");
@@ -223,7 +330,9 @@ ipcMain.handle("play", async () => {
     await L.launch({
       auth: s.auth,
       javaPath,
+      root,
       gameDir: dir,
+      minecraft: inst.minecraft,
       fabricId,
       ramMB: currentRamMB(),
       resWidth: res.resWidth,
@@ -378,10 +487,6 @@ ipcMain.handle("cape:set", async (_e, capeId) => {
   }
 });
 
-ipcMain.handle("update:install", () => {
-  autoUpdater.quitAndInstall(true, true);
-});
-
 /* ---- Ventana ---- */
 function createWindow() {
   // Buscar ícono: primero logo.png (dev), luego build/icon.ico (producción)
@@ -407,26 +512,28 @@ function createWindow() {
   setupAutoUpdater();
 }
 
-/* ---- Auto-actualizaciones automáticas desde GitHub Releases ---- */
+/* ---- Auto-actualizaciones desde GitHub Releases (el aviso lo dibuja la propia ventana) ---- */
+ipcMain.handle("update:install", () => {
+  autoUpdater.quitAndInstall(true, true); // silencioso y vuelve a abrir el launcher
+});
+
 function setupAutoUpdater() {
-  if (!app.isPackaged) return;
+  if (!app.isPackaged) return; // En modo desarrollo no busca updates
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on("checking-for-update", () => send("update", { state: "checking" }));
   autoUpdater.on("update-not-available", () => send("update", { state: "none" }));
-  autoUpdater.on("update-available", (info) =>
-    send("update", { state: "downloading", version: info.version, pct: 0 }));
-  autoUpdater.on("download-progress", (p) =>
-    send("update", { state: "downloading", pct: Math.round(p.percent || 0) }));
-  autoUpdater.on("update-downloaded", (info) =>
-    send("update", { state: "ready", version: info.version }));
+  autoUpdater.on("update-available", (info) => send("update", { state: "downloading", version: info.version, pct: 0 }));
+  autoUpdater.on("download-progress", (p) => send("update", { state: "downloading", pct: Math.round(p.percent || 0) }));
+  autoUpdater.on("update-downloaded", (info) => send("update", { state: "ready", version: info.version }));
   autoUpdater.on("error", (err) => {
     console.warn("AutoUpdater warning:", err.message);
     send("update", { state: "none" });
   });
 
+  // Comprobar actualizaciones a los 3 segundos de abrir
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(() => {});
   }, 3000);

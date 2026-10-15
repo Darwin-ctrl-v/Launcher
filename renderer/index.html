@@ -26,7 +26,7 @@
 
       <nav class="nav">
         <button class="navbtn active" data-view="play">Jugar</button>
-        <button class="navbtn" data-view="mods">Mods</button>
+        <button class="navbtn" data-view="instances">Instalaciones</button>
         <button class="navbtn" data-view="options">Opciones</button>
       </nav>
 
@@ -55,27 +55,53 @@
       <!-- JUGAR -->
       <section class="view active" id="view-play">
         <div class="play-wrap">
-          <div id="idleBox" class="idle">
+          <div class="playrow">
+            <button id="verBtn" class="verbtn" title="Elegir instalación">
+              <span class="vtxt">
+                <span id="verName" class="vname">Cargando...</span>
+                <span id="verMc" class="vmc"></span>
+              </span>
+              <span class="vcaret"></span>
+            </button>
             <button id="playBtn">JUGAR</button>
-            <div id="meta" class="meta"></div>
+            <div id="verMenu" class="vermenu" hidden></div>
           </div>
 
+          <div id="meta" class="meta"></div>
+
           <div id="loadBox" class="loading" hidden>
-            <div class="loadtitle"><span id="loadText">CARGANDO</span><span class="dots">...</span></div>
             <div class="pbar"><div id="fill"></div></div>
-            <div id="pct" class="pct">0%</div>
+            <div class="loadline">
+              <span class="loadtitle"><span id="loadText">CARGANDO</span><span class="dots">...</span></span>
+              <span id="pct" class="pct">0%</span>
+            </div>
           </div>
 
           <div id="status" class="status"></div>
         </div>
       </section>
 
-      <!-- MODS -->
+      <!-- INSTALACIONES (galería) -->
+      <section class="view" id="view-instances">
+        <div class="panel gallery-panel">
+          <div class="phead">
+            <h2 id="instTitle">INSTALACIONES</h2>
+          </div>
+          <div id="instGrid" class="instgrid"></div>
+          <p id="instHint" class="hint"></p>
+        </div>
+      </section>
+
+      <!-- MODS DE UNA INSTALACIÓN -->
       <section class="view" id="view-mods">
         <div class="panel">
           <div class="phead">
             <h2 id="modsTitle">MODS</h2>
+            <button id="modsBack" class="link">&lt; volver</button>
+          </div>
+          <div class="modtools">
             <input id="modFilter" type="text" placeholder="buscar..." spellcheck="false" />
+            <button id="modsUse" class="btn">Usar esta instalación</button>
           </div>
           <ul id="modList" class="modlist"></ul>
           <p id="modsHint" class="hint"></p>
@@ -176,14 +202,14 @@
     </main>
   </div>
 
-<div id="updateBanner">
-  <div id="updateText">Buscando actualizaciones...</div>
-  <div class="upd-bar" id="updateBar"><div id="updateFill"></div></div>
-  <div class="upd-btns" id="updateBtns">
-    <button id="updateNow" class="upd-btn upd-play">Reiniciar y actualizar</button>
-    <button id="updateLater" class="upd-btn upd-nav">Más tarde</button>
+  <div id="updateBanner">
+    <div id="updateText">Buscando actualizaciones...</div>
+    <div class="upd-bar" id="updateBar"><div id="updateFill"></div></div>
+    <div class="upd-btns" id="updateBtns">
+      <button id="updateNow" class="upd-btn upd-play">Reiniciar y actualizar</button>
+      <button id="updateLater" class="upd-btn upd-nav">Más tarde</button>
+    </div>
   </div>
-</div>
 
   <script src="background.js"></script>
   <script src="skinview3d.bundle.js"></script>

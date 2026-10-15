@@ -2,13 +2,16 @@
 // Si cambias algo aquí y ya generaste el .exe, hay que volver a generarlo (npm run build).
 module.exports = {
   appName: "MiLauncher",          // nombre de la carpeta donde se guarda el juego
-  minecraft: "1.21.1",
+  minecraft: "1.21.1",           // solo se usa si el Gist no define instalaciones
   loader: "fabric",
 
-  // URL del archivo mods.json en GitHub (enlace "Raw").
-  // Si pones tu enlace aquí, el launcher descargará la lista de mods directamente desde GitHub cada vez que juegues.
-  // Así puedes añadir o quitar mods desde GitHub sin tener que volver a compilar el launcher.
-  // Ejemplo: "https://raw.githubusercontent.com/TuUsuario/TuRepositorio/main/mods.json"
+  // URL del archivo mods.json (enlace "Raw" de tu Gist). Ahí defines las INSTALACIONES:
+  // cada una con su nombre, imagen, versión de Minecraft y lista de mods.
+  // Así puedes añadir o quitar instalaciones y mods sin volver a compilar el launcher.
+  // Formato (la instalación con id "principal" usa la carpeta de siempre, no pierde sus mundos):
+  //   { "instances": [ { "id": "principal", "name": "Principal", "image": "https://...png",
+  //                      "minecraft": "1.21.1", "loader": "fabric", "mods": ["sodium", "lithium"] } ] }
+  // El formato viejo (["sodium", "lithium"]) sigue funcionando como una sola instalación.
   modsUrl: "https://gist.githubusercontent.com/Darwin-ctrl-v/efe67e29582bc129f9bd4fe40b952f41/raw/mods.json",
 
   // Mods por defecto (o de respaldo si no hay conexión a GitHub):
@@ -22,7 +25,7 @@ module.exports = {
   ],
   userAgent: "tunombre/mi-launcher/0.2.0", // CAMBIA ESTO por algo tuyo (lo pide Modrinth)
   ram: { min: "2G", max: "4G" },
-  javaMajor: 21,                  // Minecraft 1.21.1 necesita Java 21
+  javaMajor: 21,                  // Java por defecto; cada instalación calcula el suyo según su versión de Minecraft
 
   // ---- Apariencia (lo que se ve en la ventana) ----
   branding: {

@@ -1,6 +1,11 @@
 const $ = (id) => document.getElementById(id);
 let currentUser = null;
 let currentView = "play";
+let instances = [];      // instalaciones que define tu Gist
+let selectedId = null;   // la que se va a jugar
+let viewInstId = null;   // la que se está mirando (lista de mods)
+let offline = false;
+let isIdle = true;
 
 /* ---------- utilidades ---------- */
 function readableOn(hex) {
@@ -21,8 +26,12 @@ $("logo").addEventListener("error", (e) => e.target.remove());
 /* ---------- navegación de la barra lateral ---------- */
 function showView(name) {
   currentView = name;
+  closeVerMenu();
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === "view-" + name));
-  document.querySelectorAll(".navbtn").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+  // la lista de mods es el detalle de una instalación: el botón activo sigue siendo "Instalaciones"
+  document.querySelectorAll(".navbtn").forEach((b) =>
+    b.classList.toggle("active", b.dataset.view === name || (name === "mods" && b.dataset.view === "instances")));
+  if (name === "instances") refreshInstances();
   if (name === "mods") loadMods();
   if (name === "options") loadOptions();
   if (name === "skin") openSkinView();
@@ -312,16 +321,143 @@ $("skinBox").addEventListener("click", () => {
   else showView("skin");
 });
 
-/* ---------- pestaña Mods ---------- */
+/* ---------- instalaciones ---------- */
+const instById = (id) => instances.find((i) => i.id === id);
+const loaderName = (l) => (l ? l[0].toUpperCase() + l.slice(1) : "");
+
+// Actualiza el selector y la línea de versión de debajo del botón JUGAR
+function paintSelected() {
+  const inst = instById(selectedId);
+  $("verName").textContent = inst ? inst.name : "Sin instalaciones";
+  $("verMc").textContent = inst ? inst.minecraft : "";
+  $("meta").textContent = inst ? `Minecraft ${inst.minecraft} · ${loaderName(inst.loader)}` : "";
+  syncPlayControls();
+}
+
+function syncPlayControls() {
+  $("verBtn").disabled = !isIdle || !instances.length;
+  $("playBtn").disabled = !isIdle || !instById(selectedId);
+}
+
+async function refreshInstances() {
+  try {
+    const r = await window.api.listInstances();
+    instances = r.instances || [];
+    selectedId = r.selected;
+    offline = !!r.offline;
+  } catch (e) {
+    console.error("No se pudieron cargar las instalaciones:", e);
+  }
+  paintSelected();
+  if (currentView === "instances") renderGallery();
+}
+
+async function selectInstance(id) {
+  if (!instById(id)) return;
+  selectedId = id;
+  paintSelected();
+  await window.api.selectInstance(id);
+}
+
+/* menú del selector (junto al botón JUGAR) */
+function closeVerMenu() { $("verMenu").hidden = true; }
+$("verBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const menu = $("verMenu");
+  if (!menu.hidden) return closeVerMenu();
+  menu.textContent = "";
+  for (const inst of instances) {
+    const b = document.createElement("button");
+    b.className = "veritem" + (inst.id === selectedId ? " active" : "");
+    const n = document.createElement("span");
+    n.textContent = inst.name;
+    const v = document.createElement("span");
+    v.className = "vmc";
+    v.textContent = inst.minecraft;
+    b.append(n, v);
+    b.onclick = () => { closeVerMenu(); selectInstance(inst.id); };
+    menu.appendChild(b);
+  }
+  menu.hidden = false;
+});
+document.addEventListener("click", (e) => { if (!$("verMenu").hidden && !$("verMenu").contains(e.target)) closeVerMenu(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeVerMenu(); });
+
+/* galería */
+function renderGallery() {
+  const grid = $("instGrid");
+  grid.textContent = "";
+  $("instTitle").textContent = `INSTALACIONES (${instances.length})`;
+
+  instances.forEach((inst, idx) => {
+    const card = document.createElement("button");
+    card.className = "icard" + (inst.id === selectedId ? " active" : "");
+    card.style.setProperty("--i", idx);
+
+    const imgBox = document.createElement("span");
+    imgBox.className = "iimg";
+    const letter = document.createElement("span");
+    letter.className = "iletter";
+    letter.textContent = (inst.name[0] || "?").toUpperCase();
+    imgBox.appendChild(letter);
+
+    const name = document.createElement("span");
+    name.className = "iname";
+    name.textContent = inst.name;
+    const mc = document.createElement("span");
+    mc.className = "imc";
+    mc.textContent = inst.minecraft;
+
+    card.append(imgBox, name, mc);
+    card.title = inst.description || "";
+    card.onclick = () => { viewInstId = inst.id; showView("mods"); };
+    grid.appendChild(card);
+
+    // La imagen llega aparte (descargada por el launcher); mientras tanto se ve la inicial
+    if (inst.hasImage) {
+      window.api.instanceImage(inst.id).then((data) => {
+        if (!data) return;
+        const img = new Image();
+        img.alt = "";
+        img.onload = () => { letter.remove(); imgBox.prepend(img); };
+        img.src = data;
+      });
+    }
+  });
+
+  $("instHint").textContent = offline
+    ? "Sin conexión: se muestran las instalaciones guardadas."
+    : "Haz clic en una instalación para ver sus mods.";
+}
+
+/* ---------- mods de una instalación ---------- */
 let modsCache = [];
 let modsPending = false;
 
 async function loadMods() {
-  const { items, pending: pend } = await window.api.listMods();
+  const inst = instById(viewInstId);
+  if (!inst) { showView("instances"); return; }
+  modsCache = [];
+  $("modList").textContent = "";
+  $("modFilter").value = "";
+  $("modsTitle").textContent = `${inst.name} - MODS`;
+  syncUseButton();
+
+  const { items, pending: pend } = await window.api.listMods(inst.id);
+  if (viewInstId !== inst.id) return; // cambiaste de instalación mientras cargaba
   modsPending = pend;
   modsCache = items;
   renderMods();
 }
+
+function syncUseButton() {
+  const using = viewInstId === selectedId;
+  $("modsUse").disabled = using;
+  $("modsUse").textContent = using ? "En uso" : "Usar esta instalación";
+}
+
+$("modsBack").onclick = () => showView("instances");
+$("modsUse").onclick = async () => { await selectInstance(viewInstId); showView("play"); };
 
 // Icono del mod (viene de Modrinth); si falta o no carga, se muestra la primera letra
 function makeIcon(m) {
@@ -347,7 +483,8 @@ function renderMods() {
   list.textContent = "";
   const rows = modsCache.filter((m) => m.title.toLowerCase().includes(q));
 
-  $("modsTitle").textContent = `MODS (${modsCache.length})`;
+  const inst = instById(viewInstId);
+  $("modsTitle").textContent = `${inst ? inst.name : "Mods"} - MODS (${modsCache.length})`;
   for (const m of rows) {
     const li = document.createElement("li");
     const name = document.createElement("span");
@@ -371,7 +508,7 @@ function renderMods() {
     list.appendChild(li);
   }
   $("modsHint").textContent = modsPending
-    ? "Estos mods se descargarán la primera vez que pulses JUGAR."
+    ? "Estos mods se descargarán la primera vez que juegues con esta instalación."
     : "[lib] = librería que otro mod necesita.";
 }
 $("modFilter").addEventListener("input", renderMods);
@@ -442,10 +579,14 @@ $("jvmArgs").addEventListener("change", () => {
 });
 
 /* ---------- botón JUGAR y modo carga ---------- */
+// En reposo, bajo el botón se ve la versión; al jugar, esa zona pasa a ser la barra de progreso.
 function setState(state) {
   const idle = state === "idle";
-  $("idleBox").hidden = !idle;
+  isIdle = idle;
+  $("meta").hidden = !idle;
   $("loadBox").hidden = idle;
+  if (!idle) closeVerMenu();
+  syncPlayControls();
 
   if (state === "loading") $("loadText").textContent = "CARGANDO";
   if (state === "launching") { $("loadText").textContent = "LAUNCHING GAME"; setFill(100); }
@@ -469,9 +610,10 @@ function setFill(pct) {
 }
 
 $("playBtn").onclick = async () => {
+  if (!selectedId) return;
   $("status").textContent = "";
   $("status").classList.remove("bad");
-  const r = await window.api.play();
+  const r = await window.api.play(selectedId);
   if (!r.ok) $("status").textContent += "  (mira el Registro, en el menú)";
   const u = await window.api.getSession();
   setUser(u && u.name);
@@ -502,12 +644,11 @@ window.api.onLog((line) => {
     document.documentElement.style.setProperty("--accent", b.accentColor);
     document.documentElement.style.setProperty("--accent-text", readableOn(b.accentColor));
   }
-  const loader = b.loader ? b.loader[0].toUpperCase() + b.loader.slice(1) : "";
-  $("meta").textContent = `Minecraft ${b.minecraft} · ${loader}`;
-
   const s = await window.api.getSession();
   setUser(s && s.name);
 })();
+
+refreshInstances();
 
 (() => {
   const banner = document.getElementById("updateBanner");

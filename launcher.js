@@ -8,6 +8,10 @@ const config = require("./config");
 const MODRINTH = "https://api.modrinth.com/v2";
 const headers = { "User-Agent": config.userAgent };
 
+// La instalación con este id usa la carpeta "game" de siempre,
+// así nadie pierde sus mundos ni los mods que ya tenía descargados.
+const LEGACY_ID = "principal";
+
 async function getJSON(url) {
   const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} -> ${url}`);
@@ -39,8 +43,22 @@ async function loginSaved(savedToken) {
 
 /* ---------------- Java ---------------- */
 
+// Qué Java necesita cada versión de Minecraft (se puede forzar con "java": 17 en el Gist)
+function javaMajorFor(minecraft, override) {
+  if (Number(override) > 0) return Number(override);
+  const p = String(minecraft).split(".").map((n) => parseInt(n, 10) || 0);
+  if (p[0] !== 1) return p[0] >= 26 ? 25 : 21; // versiones nuevas (26.x) y snapshots
+  const minor = p[1] || 0;
+  const patch = p[2] || 0;
+  if (minor >= 21 || (minor === 20 && patch >= 5)) return 21; // 1.20.5 y posteriores
+  if (minor >= 17) return 17; // 1.17 a 1.20.4
+  return 8; // 1.16 y anteriores
+}
+
+const javaCache = new Map();
 function javaMajor(bin) {
-  return new Promise((resolve) => {
+  if (javaCache.has(bin)) return javaCache.get(bin);
+  const p = new Promise((resolve) => {
     execFile(bin, ["-version"], { timeout: 8000 }, (err, stdout, stderr) => {
       const out = `${stderr || ""}${stdout || ""}`;
       const m = /version "(\d+)(?:\.(\d+))?/.exec(out);
@@ -48,99 +66,164 @@ function javaMajor(bin) {
       resolve(m[1] === "1" ? Number(m[2]) : Number(m[1]));
     });
   });
+  javaCache.set(bin, p);
+  p.then((v) => { if (!v) javaCache.delete(bin); }); // si no se encontró, la próxima vez se vuelve a probar
+  return p;
 }
+
+const ls = (dir) => { try { return fs.readdirSync(dir); } catch { return []; } };
 
 function javaCandidates() {
   const exe = process.platform === "win32" ? "java.exe" : "java";
   const list = [];
-  if (process.env.JAVA_HOME) list.push(path.join(process.env.JAVA_HOME, "bin", exe));
+  const add = (p) => { if (p && !list.includes(p)) list.push(p); };
+  if (process.env.JAVA_HOME) add(path.join(process.env.JAVA_HOME, "bin", exe));
 
   if (process.platform === "win32") {
-    // Java incluido con el launcher oficial de Minecraft (Java 21 = "java-runtime-delta")
-    const appdata = process.env.APPDATA;
-    if (appdata) {
-      list.push(path.join(appdata, ".minecraft", "runtime", "java-runtime-delta", "windows-x64", "java-runtime-delta", "bin", exe));
+    // Java que trae el launcher oficial de Minecraft (java-runtime-delta = 21, -beta/-gamma = 17, jre-legacy = 8...)
+    const roots = [];
+    if (process.env.APPDATA) roots.push(path.join(process.env.APPDATA, ".minecraft", "runtime"));
+    if (process.env.LOCALAPPDATA) {
+      roots.push(path.join(process.env.LOCALAPPDATA, "Packages", "Microsoft.4297127D64EC6_8wekyb3d8bbwe", "LocalCache", "Local", "runtime"));
     }
-    // Instalaciones típicas (Temurin / Microsoft / Java)
-    for (const base of ["C:\\Program Files\\Eclipse Adoptium", "C:\\Program Files\\Microsoft", "C:\\Program Files\\Java"]) {
-      try {
-        for (const d of fs.readdirSync(base)) {
-          if (/(jdk|jre)-?21/i.test(d)) list.push(path.join(base, d, "bin", exe));
-        }
-      } catch {}
+    for (const root of roots) {
+      for (const name of ls(root)) {
+        for (const plat of ls(path.join(root, name))) add(path.join(root, name, plat, name, "bin", exe));
+      }
+    }
+    // Instalaciones típicas (Temurin / Microsoft / Java / Zulu / Corretto...)
+    const pf = [process.env.ProgramFiles, process.env["ProgramFiles(x86)"]].filter(Boolean);
+    for (const p of pf) {
+      for (const vendor of ["Eclipse Adoptium", "Microsoft", "Java", "Zulu", "Amazon Corretto", "BellSoft", "Semeru"]) {
+        for (const d of ls(path.join(p, vendor))) add(path.join(p, vendor, d, "bin", exe));
+      }
     }
   }
-  list.push("java"); // el que esté en el PATH
+  add("java"); // el que esté en el PATH
   return list;
 }
 
-async function findJava() {
-  for (const c of javaCandidates()) {
-    const v = await javaMajor(c);
-    if (v && v >= config.javaMajor) return c;
-  }
-  return null;
+// Busca el Java exacto que pide la versión; si no hay, el más cercano que sea más nuevo
+async function findJava(major = config.javaMajor) {
+  const found = await Promise.all(javaCandidates().map(async (c) => ({ c, v: await javaMajor(c) })));
+  const ok = found.filter((x) => x.v);
+  const exact = ok.find((x) => x.v === major);
+  if (exact) return exact.c;
+  const higher = ok.filter((x) => x.v > major).sort((a, b) => a.v - b.v)[0];
+  return higher ? higher.c : null;
 }
 
 /* ---------------- Fabric ---------------- */
 
-// Descarga el perfil de Fabric y lo deja en <juego>/versions/<id>/<id>.json
-async function ensureFabric(gameDir) {
-  const loaders = await getJSON(`https://meta.fabricmc.net/v2/versions/loader/${config.minecraft}`);
-  const elegido = loaders.find((l) => l.loader.stable) || loaders[0];
-  const loaderVersion = elegido.loader.version;
-  const id = `fabric-loader-${loaderVersion}-${config.minecraft}`;
-  const dir = path.join(gameDir, "versions", id);
-  const file = path.join(dir, `${id}.json`);
-
-  if (!fs.existsSync(file)) {
-    const profile = await getJSON(
-      `https://meta.fabricmc.net/v2/versions/loader/${config.minecraft}/${loaderVersion}/profile/json`
-    );
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(profile, null, 2));
-  }
-  return id;
+function localFabric(root, mc) {
+  const dir = path.join(root, "versions");
+  const ids = ls(dir).filter((d) => d.startsWith("fabric-loader-") && d.endsWith(`-${mc}`) && fs.existsSync(path.join(dir, d, `${d}.json`)));
+  return ids.sort().pop() || null;
 }
 
-/* ---------------- Mods (Modrinth + Remoto GitHub) ---------------- */
+// Descarga el perfil de Fabric y lo deja en <root>/versions/<id>/<id>.json
+async function ensureFabric(root, mc) {
+  try {
+    const loaders = await getJSON(`https://meta.fabricmc.net/v2/versions/loader/${mc}`);
+    if (!loaders.length) throw new Error(`Fabric todavía no está disponible para Minecraft ${mc}`);
+    const elegido = loaders.find((l) => l.loader.stable) || loaders[0];
+    const loaderVersion = elegido.loader.version;
+    const id = `fabric-loader-${loaderVersion}-${mc}`;
+    const dir = path.join(root, "versions", id);
+    const file = path.join(dir, `${id}.json`);
 
-async function getModSlugs() {
-  if (config.modsUrl && typeof config.modsUrl === "string" && config.modsUrl.trim()) {
-    try {
-      let rawUrl = config.modsUrl.trim();
-      // Si es un enlace de GitHub Gist con hash de commit específico (/raw/<40-chars-hash>/archivo.json),
-      // lo convertimos a /raw/archivo.json para que SIEMPRE descargue los cambios más recientes.
-      rawUrl = rawUrl.replace(/(gist\.githubusercontent\.com\/[^/]+\/[^/]+\/raw\/)[a-f0-9]{40}\//i, "$1");
-
-      const url = rawUrl + (rawUrl.includes("?") ? "&" : "?") + "t=" + Date.now();
-      const res = await fetch(url, {
-        headers: { "User-Agent": config.userAgent, "Cache-Control": "no-cache" },
-      });
-      if (res.ok) {
-        const text = await res.text();
-        // Tolerar comas finales como ["mod1", "mod2",] para que no falle el JSON
-        const cleaned = text.replace(/,\s*([\]}])/g, "$1");
-        const data = JSON.parse(cleaned);
-        const list = Array.isArray(data) ? data : (data && Array.isArray(data.mods) ? data.mods : null);
-        if (list && list.length > 0) {
-          return list.map((s) => String(s).trim()).filter(Boolean);
-        }
-      }
-    } catch (e) {
-      console.warn("No se pudo obtener la lista de mods desde GitHub, usando lista local:", e.message);
+    if (!fs.existsSync(file)) {
+      const profile = await getJSON(`https://meta.fabricmc.net/v2/versions/loader/${mc}/${loaderVersion}/profile/json`);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(file, JSON.stringify(profile, null, 2));
     }
+    return id;
+  } catch (e) {
+    const local = localFabric(root, mc); // sin conexión: se usa el Fabric que ya está descargado
+    if (local) return local;
+    throw e;
   }
-  return config.mods || [];
 }
 
-async function resolveMods(slugs) {
-  const found = new Map(); // project_id -> datos del mod
-  const g = encodeURIComponent(JSON.stringify([config.minecraft]));
-  const l = encodeURIComponent(JSON.stringify([config.loader]));
+/* ---------------- Instalaciones (las define el Gist) ---------------- */
 
-  // Comprobar si Iris está en la lista de mods
-  const hasIris = slugs.some((s) => String(s).toLowerCase().startsWith("iris"));
+async function fetchRemoteJSON() {
+  let rawUrl = (config.modsUrl || "").trim();
+  if (!rawUrl) throw new Error("No hay modsUrl en config.js");
+  // Si es un enlace de Gist con hash de commit (/raw/<40-chars-hash>/archivo.json),
+  // lo convertimos a /raw/archivo.json para que SIEMPRE descargue los cambios más recientes.
+  rawUrl = rawUrl.replace(/(gist\.githubusercontent\.com\/[^/]+\/[^/]+\/raw\/)[a-f0-9]{40}\//i, "$1");
+
+  const url = rawUrl + (rawUrl.includes("?") ? "&" : "?") + "t=" + Date.now();
+  const res = await fetch(url, {
+    headers: { "User-Agent": config.userAgent, "Cache-Control": "no-cache" },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} -> ${rawUrl}`);
+  const text = await res.text();
+  // Tolerar comas finales como ["mod1", "mod2",] para que no falle el JSON
+  return JSON.parse(text.replace(/,\s*([\]}])/g, "$1"));
+}
+
+const slugify = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+const cleanMods = (list) => (Array.isArray(list) ? list.map((s) => String(s).trim()).filter(Boolean) : []);
+
+function legacyInstance(mods) {
+  return {
+    id: LEGACY_ID,
+    name: "Principal",
+    image: "",
+    description: "",
+    minecraft: config.minecraft,
+    loader: String(config.loader || "fabric").toLowerCase(),
+    java: null,
+    mods: mods || cleanMods(config.mods),
+  };
+}
+
+// Acepta el formato nuevo ({ "instances": [...] }) y el viejo (["sodium", ...] o { "mods": [...] })
+function normalizeInstances(data) {
+  if (data && Array.isArray(data.instances)) {
+    const seen = new Set();
+    const out = [];
+    for (const raw of data.instances) {
+      if (!raw || typeof raw !== "object") continue;
+      const id = slugify(raw.id || raw.name);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push({
+        id,
+        name: String(raw.name || id),
+        image: raw.image ? String(raw.image).trim() : "",
+        description: raw.description ? String(raw.description) : "",
+        minecraft: String(raw.minecraft || config.minecraft),
+        loader: String(raw.loader || config.loader || "fabric").toLowerCase(),
+        java: Number(raw.java) > 0 ? Number(raw.java) : null,
+        mods: cleanMods(raw.mods),
+      });
+    }
+    if (out.length) return out;
+  }
+  const list = Array.isArray(data) ? data : data && Array.isArray(data.mods) ? data.mods : null;
+  if (list && list.length) return [legacyInstance(cleanMods(list))];
+  return null;
+}
+
+async function fetchInstances() {
+  const found = normalizeInstances(await fetchRemoteJSON());
+  if (!found) throw new Error("El archivo del Gist está vacío o no tiene un formato válido");
+  return found;
+}
+
+// Si no hay Gist ni copia guardada: una sola instalación con lo que diga config.js
+const fallbackInstances = () => [legacyInstance()];
+
+/* ---------------- Mods (Modrinth) ---------------- */
+
+async function resolveMods(slugs, mc, loader) {
+  const found = new Map(); // project_id -> datos del mod
+  const g = encodeURIComponent(JSON.stringify([mc]));
+  const l = encodeURIComponent(JSON.stringify([loader]));
 
   async function add(idOrSlug, esDependencia, specificVersionId) {
     let cleanId = idOrSlug;
@@ -153,8 +236,8 @@ async function resolveMods(slugs) {
       targetVer = parts[1].trim();
     }
 
-    // Para Iris en 1.21.1: usar la versión 1.8.14-beta.1 que es compatible con la última versión de Sodium 0.8.x
-    if (!targetVer && (cleanId === "iris" || cleanId === "YL57xq9U") && config.minecraft === "1.21.1") {
+    // Para Iris en 1.21.1: usar la versión 1.8.14, compatible con la última versión de Sodium 0.8.x
+    if (!targetVer && (cleanId === "iris" || cleanId === "YL57xq9U") && mc === "1.21.1") {
       targetVer = "1.8.14";
     }
 
@@ -173,7 +256,7 @@ async function resolveMods(slugs) {
     if (!v) {
       v = ["release", "beta", "alpha"].map((t) => versions.find((x) => x.version_type === t)).find(Boolean);
     }
-    if (!v) throw new Error(`"${project.title}" no tiene versión compatible para ${config.minecraft} + ${config.loader}`);
+    if (!v) throw new Error(`"${project.title}" no tiene versión compatible para ${mc} + ${loader}`);
 
     const file = v.files.find((f) => f.primary) || v.files[0];
     found.set(project.id, {
@@ -216,7 +299,7 @@ async function downloadVerified(url, dest, sha1) {
 
 const manifestPath = (gameDir) => path.join(gameDir, "mods-manifest.json");
 
-// Lista de mods que se ve en la pestaña "Mods" del launcher
+// Lista de mods que se ve al abrir una instalación
 function readModsManifest(gameDir) {
   try {
     return JSON.parse(fs.readFileSync(manifestPath(gameDir), "utf8"));
@@ -225,14 +308,14 @@ function readModsManifest(gameDir) {
   }
 }
 
-async function syncMods(gameDir, onStatus, onProgress) {
+// gameDir = carpeta de la instalación (aquí van sus mods, mundos y opciones)
+async function syncMods(gameDir, inst, onStatus, onProgress) {
   const modsDir = path.join(gameDir, "mods");
   fs.mkdirSync(modsDir, { recursive: true });
 
   let list;
   try {
-    const slugs = await getModSlugs();
-    list = await resolveMods(slugs);
+    list = await resolveMods(inst.mods, inst.minecraft, inst.loader);
   } catch (e) {
     const hayJars = fs.readdirSync(modsDir).some((f) => f.endsWith(".jar"));
     if (hayJars && /fetch failed|ENOTFOUND|ECONN|network/i.test(String(e.message + e.cause))) {
@@ -264,7 +347,8 @@ async function syncMods(gameDir, onStatus, onProgress) {
 
 /* ---------------- Lanzar el juego ---------------- */
 
-async function launch({ auth, javaPath, gameDir, fabricId, ramMB, resWidth, resHeight, jvmArgs, onLog, onProgress, onReady, onClose }) {
+// root = carpeta compartida (assets, librerías, versiones); gameDir = carpeta propia de la instalación
+async function launch({ auth, javaPath, root, gameDir, minecraft, fabricId, ramMB, resWidth, resHeight, jvmArgs, onLog, onProgress, onReady, onClose }) {
   const client = new Client();
   let ready = false;
   const markReady = () => {
@@ -288,11 +372,17 @@ async function launch({ auth, javaPath, gameDir, fabricId, ramMB, resWidth, resH
 
   const launchOpts = {
     authorization: auth,
-    root: gameDir,
+    root,
     javaPath,
-    version: { number: config.minecraft, type: "release", custom: fabricId },
+    version: { number: minecraft, type: "release", custom: fabricId },
     memory: { min: `${Math.min(2048, ramMB)}M`, max: `${ramMB}M` },
   };
+
+  // Cada instalación juega en su propia carpeta (mods, mundos, opciones...)
+  if (gameDir && path.resolve(gameDir) !== path.resolve(root)) {
+    fs.mkdirSync(gameDir, { recursive: true });
+    launchOpts.overrides = { gameDirectory: gameDir, cwd: gameDir };
+  }
 
   // Resolución de ventana
   if (resWidth && resHeight) {
@@ -311,7 +401,7 @@ async function launch({ auth, javaPath, gameDir, fabricId, ramMB, resWidth, resH
   return proc;
 }
 
-// Título e icono de varios mods de una sola vez (para la pestaña Mods, aunque aún no se hayan descargado)
+// Título e icono de varios mods de una sola vez (para la lista de mods, aunque aún no se hayan descargado)
 const infoCache = new Map(); // slug -> { title, icon }
 async function fetchProjectInfo(slugs) {
   const faltan = slugs.filter((s) => !infoCache.has(s));
@@ -323,4 +413,18 @@ async function fetchProjectInfo(slugs) {
   return infoCache;
 }
 
-module.exports = { loginMicrosoft, loginSaved, findJava, ensureFabric, syncMods, readModsManifest, fetchProjectInfo, launch, getModSlugs };
+module.exports = {
+  LEGACY_ID,
+  loginMicrosoft,
+  loginSaved,
+  findJava,
+  javaMajorFor,
+  ensureFabric,
+  fetchInstances,
+  normalizeInstances,
+  fallbackInstances,
+  syncMods,
+  readModsManifest,
+  fetchProjectInfo,
+  launch,
+};

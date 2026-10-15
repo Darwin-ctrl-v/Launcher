@@ -90,7 +90,7 @@ h1 { margin: 0; font-size: 32px; font-weight: normal; line-height: 1; overflow-w
 .meta { color: #fff; text-shadow: 2px 2px 0 #000; }
 
 /* Botón Jugar: usa la imagen assets/ui/btn-play.png (9 zonas, el centro se estira) */
-#playBtn { cursor: pointer; width: 340px; padding: 8px 0; font-size: 32px; letter-spacing: 2px;
+#playBtn { cursor: pointer; width: 220px; padding: 8px 0; font-size: 32px; letter-spacing: 2px;
            color: #2b1b00; text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.35); background: none;
            border-style: solid; border-width: calc(var(--pp) * 5);
            border-image: url("assets/ui/btn-play.png") 5 fill / calc(var(--pp) * 5) stretch;
@@ -292,3 +292,67 @@ h3 { margin: 0; font-size: 16px; font-weight: normal; letter-spacing: 1px; color
 .upd-btn:active { transform: translateY(1px); }
 .upd-btn:disabled { filter: grayscale(1) brightness(0.8); opacity: 0.6; cursor: not-allowed; animation: none; }
 @keyframes upd-pulse { 50% { filter: brightness(1.2); } }
+
+
+/* ====== Barra de Jugar: [ instalación ][ JUGAR ] ====== */
+.playrow { position: relative; display: flex; align-items: stretch; gap: 8px; }
+
+/* Selector de instalación: usa la imagen negra (btn-nav.png). Para hacerlo amarillo, cambia "btn-nav" por "btn-play" */
+.verbtn { all: unset; box-sizing: border-box; cursor: pointer; width: 220px;
+          display: flex; align-items: center; justify-content: space-between; gap: 8px;
+          color: var(--text);
+          border-style: solid; border-width: calc(var(--pp) * 4);
+          border-image: url("assets/ui/btn-nav.png") 4 fill / calc(var(--pp) * 4) stretch;
+          image-rendering: pixelated; transition: filter 0.1s, transform 0.1s; }
+.verbtn:hover { filter: brightness(1.3); }
+.verbtn:active { transform: translateY(1px); }
+.verbtn:disabled { filter: grayscale(1) brightness(0.7); cursor: not-allowed; transform: none; }
+.vtxt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vname { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); }
+.vmc { display: block; color: var(--muted); }
+.vcaret { flex: none; width: 0; height: 0; margin-top: 6px; border: 6px solid transparent; border-top-color: var(--text); }
+
+#playBtn:disabled { filter: grayscale(0.7) brightness(0.8); cursor: not-allowed; transform: none; animation: none; }
+#playBtn:disabled:hover { filter: grayscale(0.7) brightness(0.8); transform: none; }
+
+/* Menú desplegable de instalaciones (se abre hacia arriba) */
+.vermenu { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 60; min-width: 220px; max-width: 448px; max-height: 260px;
+           overflow: auto; padding: 4px; display: flex; flex-direction: column;
+           background: rgba(10, 8, 22, 0.97); border: 2px solid #000;
+           box-shadow: inset 2px 2px 0 var(--edge), inset -2px -2px 0 var(--edge-dark), 4px 4px 0 rgba(0, 0, 0, 0.6);
+           transform-origin: left bottom; animation: menuUp 0.18s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes menuUp { from { opacity: 0; transform: translateY(10px) scale(0.96); } to { opacity: 1; transform: none; } }
+.veritem { all: unset; box-sizing: border-box; cursor: pointer; padding: 8px 12px; display: flex; justify-content: space-between; gap: 16px;
+           transition: background 0.12s, color 0.12s; }
+.veritem:hover { background: rgba(255, 255, 255, 0.12); color: var(--accent); }
+.veritem.active { color: var(--accent); }
+.veritem .vmc { white-space: nowrap; }
+
+/* Debajo del botón: versión (reposo) o barra de progreso (al jugar) */
+.loading { width: 448px; max-width: 90%; gap: 6px; }
+.pbar { height: 26px; }
+.loadline { display: flex; justify-content: space-between; gap: 12px; }
+.loadtitle { font-size: 16px; text-align: left; color: #fff; text-shadow: 2px 2px 0 #000; }
+
+/* ====== Galería de instalaciones ====== */
+.gallery-panel { max-width: 720px; overflow: auto; }
+.instgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 18px 16px; padding: 4px; }
+.icard { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px;
+         animation: cardIn 0.3s ease both; animation-delay: calc(var(--i, 0) * 45ms); }
+@keyframes cardIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.iimg { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; display: grid; place-items: center;
+        background: rgba(0, 0, 0, 0.35); border: 2px solid #000; transition: transform 0.12s, filter 0.12s; }
+.iimg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.iimg::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+               box-shadow: inset 2px 2px 0 var(--edge), inset -2px -2px 0 var(--edge-dark); }
+.iletter { font-size: 32px; color: var(--muted); }
+.icard:hover .iimg { transform: translateY(-3px); filter: brightness(1.15); }
+.iname { max-width: 100%; text-align: center; overflow-wrap: anywhere; text-shadow: 2px 2px 0 #000; }
+.imc { color: var(--muted); text-align: center; }
+.icard.active .iimg { outline: 2px solid var(--accent); outline-offset: 2px; }
+.icard.active .iname { color: var(--accent); }
+
+/* Mods de una instalación */
+.modtools { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.btn:disabled { opacity: 0.6; cursor: default; filter: none; }
+
