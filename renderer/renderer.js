@@ -328,9 +328,8 @@ const loaderName = (l) => (l ? l[0].toUpperCase() + l.slice(1) : "");
 // Actualiza el selector y la línea de versión de debajo del botón JUGAR
 function paintSelected() {
   const inst = instById(selectedId);
-  $("verName").textContent = inst ? inst.name : "Sin instalaciones";
-  $("verMc").textContent = inst ? inst.minecraft : "";
-  $("meta").textContent = inst ? `Minecraft ${inst.minecraft} · ${loaderName(inst.loader)}` : "";
+  // Sin caja de nombre: la instalación elegida se ve en la línea de debajo del botón
+  $("meta").textContent = inst ? `${inst.name} · Minecraft ${inst.minecraft} · ${loaderName(inst.loader)}` : "Sin instalaciones";
   syncPlayControls();
 }
 
@@ -361,7 +360,7 @@ async function selectInstance(id) {
 
 /* menú del selector (junto al botón JUGAR) */
 function closeVerMenu() { $("verMenu").hidden = true; }
-$("verBtn").addEventListener("click", (e) => {
+function toggleVerMenu(e) {
   e.stopPropagation();
   const menu = $("verMenu");
   if (!menu.hidden) return closeVerMenu();
@@ -379,7 +378,8 @@ $("verBtn").addEventListener("click", (e) => {
     menu.appendChild(b);
   }
   menu.hidden = false;
-});
+}
+$("verBtn").addEventListener("click", toggleVerMenu);
 document.addEventListener("click", (e) => { if (!$("verMenu").hidden && !$("verMenu").contains(e.target)) closeVerMenu(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeVerMenu(); });
 

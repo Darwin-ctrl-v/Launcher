@@ -295,7 +295,7 @@ h3 { margin: 0; font-size: 16px; font-weight: normal; letter-spacing: 1px; color
 
 
 /* ====== Barra de Jugar: [ instalación ][ JUGAR ] ====== */
-.playrow { position: relative; display: flex; align-items: stretch; gap: 8px; }
+.playrow { --row-h: 94px; position: relative; display: flex; align-items: stretch; gap: 6px; width: 440px; max-width: 100%; height: var(--row-h); }
 
 /* Selector de instalación: usa la imagen negra (btn-nav.png). Para hacerlo amarillo, cambia "btn-nav" por "btn-play" */
 .verbtn { all: unset; box-sizing: border-box; cursor: pointer; width: 220px;
@@ -307,11 +307,13 @@ h3 { margin: 0; font-size: 16px; font-weight: normal; letter-spacing: 1px; color
 .verbtn:hover { filter: brightness(1.3); }
 .verbtn:active { transform: translateY(1px); }
 .verbtn:disabled { filter: grayscale(1) brightness(0.7); cursor: not-allowed; transform: none; }
-.vtxt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.vname { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); }
 .vmc { display: block; color: var(--muted); }
 .vcaret { flex: none; width: 0; height: 0; margin-top: 6px; border: 6px solid transparent; border-top-color: var(--text); }
+.verarrow { flex: none; width: var(--row-h); justify-content: center; } /* cuadrado: mismo ancho que el alto de la fila */
+.verarrow .vcaret { margin-top: 8px; border-width: 8px; }
+.verarrow:hover .vcaret { border-top-color: var(--accent); }
 
+#playBtn { flex: 1; width: auto; min-width: 0; }
 #playBtn:disabled { filter: grayscale(0.7) brightness(0.8); cursor: not-allowed; transform: none; animation: none; }
 #playBtn:disabled:hover { filter: grayscale(0.7) brightness(0.8); transform: none; }
 
@@ -329,7 +331,7 @@ h3 { margin: 0; font-size: 16px; font-weight: normal; letter-spacing: 1px; color
 .veritem .vmc { white-space: nowrap; }
 
 /* Debajo del botón: versión (reposo) o barra de progreso (al jugar) */
-.loading { width: 448px; max-width: 90%; gap: 6px; }
+.loading { width: 440px; max-width: 90%; gap: 6px; }
 .pbar { height: 26px; }
 .loadline { display: flex; justify-content: space-between; gap: 12px; }
 .loadtitle { font-size: 16px; text-align: left; color: #fff; text-shadow: 2px 2px 0 #000; }
@@ -340,7 +342,7 @@ h3 { margin: 0; font-size: 16px; font-weight: normal; letter-spacing: 1px; color
 .icard { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px;
          animation: cardIn 0.3s ease both; animation-delay: calc(var(--i, 0) * 45ms); }
 @keyframes cardIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-.iimg { position: relative; width: 100%; aspect-ratio: 1 / 1; overflow: hidden; display: grid; place-items: center;
+.iimg { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; display: grid; place-items: center;
         background: rgba(0, 0, 0, 0.35); border: 2px solid #000; transition: transform 0.12s, filter 0.12s; }
 .iimg img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .iimg::after { content: ""; position: absolute; inset: 0; pointer-events: none;
